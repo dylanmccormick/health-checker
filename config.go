@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/dylanmccormick/health-checker/assert"
 )
 
 type Config struct {
@@ -18,6 +20,7 @@ func GetConfig() (Config, error) {
 	dat, err := os.ReadFile("./config.json")
 	if err != nil {
 		fmt.Println(err)
+		return Config{}, err
 	}
 
 	conf := Config{}
@@ -27,5 +30,31 @@ func GetConfig() (Config, error) {
 		return Config{}, err
 	}
 
-	return conf, nil
+	return validateConfig(conf)
+}
+
+func validateConfig(c Config) (Config, error) {
+	// At some point we should have default values which are set if something doesn't exist
+	assert.Assert(c.IntervalSeconds > 0, "Interval Seconds Must Be Positive")
+	assert.Assert(c.TimeoutSeconds > 0, "Timeout Seconds Must Be Positive")
+	c.Urls = ValidateUrls(c.Urls)
+	return c, nil
+}
+
+func ValidateUrls(urls []string) []string {
+	assert.Assert(len(urls) > 0, "No URLs provided")
+
+	var returnUrls []string
+	for _, u := range urls {
+		if validateUrl(u) {
+			returnUrls = append(returnUrls, u)
+		}
+	}
+
+	assert.Assert(len(returnUrls) > 0, "No valid URLs provided")
+	return returnUrls
+}
+
+func validateUrl(url string) bool {
+	return true
 }
