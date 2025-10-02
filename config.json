@@ -5,6 +5,6 @@
 		"https://google.com",
 		"https://github.com",
 		"https://example.com",
-		"https://httpstat.us/500"
+		"https://httpbin.org/status/500"
 	]
 }

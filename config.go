@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/dylanmccormick/health-checker/assert"
@@ -12,6 +13,7 @@ type Config struct {
 	IntervalSeconds int      `json:"check_interval_seconds"`
 	TimeoutSeconds  int      `json:"timeout_seconds"`
 	Urls            []string `json:"Urls"`
+	httpClient      *http.Client
 }
 
 func GetConfig() (Config, error) {
