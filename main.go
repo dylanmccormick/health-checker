@@ -71,16 +71,19 @@ func HealthCheck(url string, c Config, sigChan chan os.Signal, wg *sync.WaitGrou
 				fmt.Println(err)
 				return
 			}
+			start := time.Now()
 			resp, err := c.httpClient.Do(req)
 			if err != nil {
-				panic(err)
+				slog.Error("", "url", url, "status", "NONE", "healthy", false, "response_time", fmt.Sprintf("%dms",time.Since(start).Milliseconds()))
+				continue
 			}
+			defer resp.Body.Close()
 			switch resp.StatusCode {
 			case http.StatusInternalServerError:
-				slog.Error("", "url", url, "status", resp.StatusCode, "healthy", false)
+				slog.Error("", "url", url, "status", resp.StatusCode, "healthy", false, "response_time", fmt.Sprintf("%dms",time.Since(start).Milliseconds()))
 
 			case http.StatusOK:
-				slog.Info("", "url", url, "status", resp.StatusCode, "healthy", true)
+				slog.Info("", "url", url, "status", resp.StatusCode, "healthy", true, "response_time", fmt.Sprintf("%dms",time.Since(start).Milliseconds()))
 			}
 		}
 	}
