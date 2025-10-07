@@ -10,6 +10,12 @@ Learning structured logging, HTTP clients, concurrency, and "Tiger Style" progra
 ✅ Signal handling setup
 ✅ Goroutine foundation
 ✅ HTTP client setup
+✅ **Status code range checking (200-299)** - COMPLETED!
+✅ **Proper URL validation** - COMPLETED!
+✅ **Context-based cancellation** - COMPLETED!
+✅ **Configured interval usage** - COMPLETED!
+✅ **JSON field case mismatch** - COMPLETED!
+✅ **Basic metrics implementation** - IN PROGRESS (debugging needed)
 
 ## Critical Issues Fixed/To Fix
 
@@ -22,12 +28,28 @@ wg.Add(i)  // This adds 0, 1, 2, 3...
 wg.Add(1)  // Add 1 for each goroutine
 ```
 
-### 🔧 High Priority Remaining Issues
-1. **Status Code Handling**: Only checking 200/500, need 200-299 = healthy
-2. **URL Validation**: `validateUrl()` just returns `true` - needs actual validation
-3. **Signal Handling**: Context-based cancellation instead of direct signal channels
-4. **Config Interval**: Using hardcoded 1 second instead of `config.IntervalSeconds`
-5. **JSON Case Mismatch**: `"urls"` in JSON vs `Urls` in struct
+### ✅ COMPLETED: All 5 High Priority Issues!
+1. ✅ **Status Code Handling**: Now properly checks 200-299 range for healthy
+2. ✅ **URL Validation**: Proper `net/url` parsing with scheme and host validation
+3. ✅ **Signal Handling**: Clean context-based cancellation pattern
+4. ✅ **Config Interval**: Using `h.config.IntervalSeconds` throughout
+5. ✅ **JSON Case Mismatch**: Fixed `json:"urls"` tag to match JSON file
+
+### 🔧 Current Issue: Metrics Debugging
+**Problem**: Metrics showing incorrect values:
+- Average response times in millions of milliseconds (should be ~50ms)
+- Multiple metric entries per URL (possible key inconsistency)
+- Some URLs showing 0 successful checks despite 200 responses
+
+**Suspected Issues**:
+- Time units mixing (`time.Milliseconds()` vs `time.Duration` math)
+- Map key inconsistencies (URL formatting differences)
+- Possible concurrent access issues with map[string]URLMetrics
+
+**Next Debug Steps**:
+- Add URL to metrics log output to identify which URL each line represents
+- Check for trailing slashes or other URL key variations
+- Verify time calculation units in average computation
 
 ### Medium Priority
 - Add max URLs limit (safety: max 100 URLs)
@@ -36,7 +58,6 @@ wg.Add(1)  // Add 1 for each goroutine
 
 ### Low Priority
 - Unit tests
-- Metrics (success rates, avg response times)
 - Enhanced logging
 
 ## Context Best Practices Learned
@@ -151,9 +172,9 @@ health-checker/
 - `github.com/lmittmann/tint` - Colored structured logging
 - Standard library: `log/slog`, `context`, `net/http`, `os/signal`
 
-## Quick Reference: Status Code Logic
+## Quick Reference: Status Code Logic ✅ IMPLEMENTED
 ```go
-// Current (incomplete)
+// BEFORE (incomplete)
 switch resp.StatusCode {
 case http.StatusOK:
     // healthy
@@ -161,23 +182,68 @@ case http.StatusInternalServerError:
     // unhealthy
 }
 
-// Should be (per requirements)
-healthy := resp.StatusCode >= 200 && resp.StatusCode < 300
+// AFTER (correct range checking)
+if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+    // healthy - covers all 2xx codes
+} else {
+    // unhealthy
+}
 ```
 
-## Quick Reference: URL Validation
+## Quick Reference: URL Validation ✅ IMPLEMENTED
 ```go
-// Current (stub)
+// BEFORE (stub)
 func validateUrl(url string) bool {
     return true
 }
 
-// Should be
-func validateUrl(urlStr string) bool {
-    u, err := url.Parse(urlStr)
-    return err == nil && (u.Scheme == "http" || u.Scheme == "https")
+// AFTER (proper validation)
+func validateUrl(u string) bool {
+    parsedUrl, err := url.Parse(u)
+    if err != nil {
+        slog.Error("Unable to parse URL", "err", err)
+        return false
+    }
+    if parsedUrl.Host == "" { return false }
+    if parsedUrl.Scheme != "http" && parsedUrl.Scheme != "https" { return false }
+    return true
 }
 ```
+
+## Metrics Implementation Lessons Learned
+
+### Concurrent Map Access Patterns
+```go
+// PROBLEM: Cannot take address of map values
+m := &h.metrics[url]  // ERROR: cannot take address
+
+// SOLUTION 1: Store pointers in map
+metrics map[string]*URLMetrics
+
+// SOLUTION 2: Access directly
+h.metrics[url].Mutex.Lock()
+m := h.metrics[url]
+// ... modify m ...
+h.metrics[url] = m  // Put back
+```
+
+### RWMutex Patterns
+```go
+// READ operations (multiple readers OK)
+m.Mutex.RLock()
+value := m.TotalChecks
+m.Mutex.RUnlock()
+
+// WRITE operations (exclusive access)
+m.Mutex.Lock()
+m.TotalChecks += 1
+m.Mutex.Unlock()
+```
+
+### Common Gotchas
+- **Never defer unlock in loops** - accumulates locks!
+- **Copy vs pointer semantics** - copying a struct copies the mutex too
+- **Time arithmetic** - mixing `time.Duration` and `int64` milliseconds
 
 ## Testing Strategy
 - Unit tests for config validation
@@ -191,19 +257,39 @@ func validateUrl(urlStr string) bool {
 ✅ Basic goroutine patterns
 ✅ Signal handling concepts
 ✅ HTTP client setup
+✅ **Context patterns and cancellation** - Clean signal-to-context flow
+✅ **URL parsing and validation** - Using `net/url` package effectively
+✅ **HTTP status code semantics** - Understanding 2xx range for success
+✅ **JSON struct tags** - Proper mapping between JSON and Go structs
+✅ **Concurrent programming basics** - Goroutines, WaitGroups, and coordination
 
 ## Learning Goals In Progress
-🔄 Context patterns and cancellation
+🔄 **Concurrent state management** - Metrics with mutex/RWMutex patterns
+🔄 **Map vs pointer semantics** - Learning when you can/cannot take addresses
+🔄 **Time/Duration arithmetic** - Proper handling of time calculations
 🔄 Proper error handling strategies
-🔄 Goroutine coordination with WaitGroups
 🔄 HTTP client best practices
 
+## Current Session Progress (MAJOR WIN! 🎉)
+**COMPLETED ALL 5 HIGH PRIORITY ISSUES:**
+1. ✅ Status code range checking (200-299)
+2. ✅ URL validation with proper scheme/host checking
+3. ✅ Context-based signal handling (removed unnecessary sigChan parameter)
+4. ✅ Configured interval usage (no more hardcoded 1 second)
+5. ✅ JSON case mismatch fix
+
+**STARTED: Basic Metrics Implementation**
+- Learned about concurrent map access issues
+- Explored mutex vs RWMutex for different access patterns
+- Discovered Go's restriction on taking addresses of map values
+- Implemented per-URL metrics tracking structure
+
 ## Next Session Priorities
-1. Fix status code range checking (200-299)
-2. Implement proper URL validation
-3. Convert signal handling to context-based cancellation
-4. Use configured interval instead of hardcoded 1 second
-5. Fix JSON field case mismatch
+1. **Debug metrics calculation issues** (time units, URL keys, concurrent access)
+2. **Finalize metrics display** (clean up output formatting)
+3. **Add max URLs limit** (safety: max 100 URLs)
+4. **Enhanced error handling** with more context
+5. **Unit tests** for validation functions
 
 ## Development Philosophy Notes
 - "Tiger Style" programming - account for negative space, program in assumptions
