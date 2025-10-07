@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/dylanmccormick/health-checker/assert"
@@ -12,7 +14,7 @@ import (
 type Config struct {
 	IntervalSeconds int      `json:"check_interval_seconds"`
 	TimeoutSeconds  int      `json:"timeout_seconds"`
-	Urls            []string `json:"Urls"`
+	Urls            []string `json:"urls"`
 	httpClient      *http.Client
 }
 
@@ -57,6 +59,15 @@ func ValidateUrls(urls []string) []string {
 	return returnUrls
 }
 
-func validateUrl(url string) bool {
+func validateUrl(u string) bool {
+	parsedUrl, err := url.Parse(u)
+	if err != nil {
+		slog.Error("Unable to parse URL", "err", err)
+		return false
+	}
+	if parsedUrl.Host == "" { return false }
+	if parsedUrl.Scheme != "http" && parsedUrl.Scheme != "https" { return false }
+
 	return true
+
 }
