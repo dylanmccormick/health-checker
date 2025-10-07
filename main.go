@@ -112,9 +112,10 @@ func (h *HealthChecker) logMetrics(ctx context.Context) {
 				}
 				slog.Info(
 					"metrics",
+					"URL", u,
 					"TotalChecks", m.TotalChecks,
 					"SuccessfulChecks", m.SuccessfulChecks,
-					"AvgResponseTime", fmt.Sprintf("%dms", int(m.TotalResponseTime)/m.TotalChecks),
+					"AvgResponseTime", fmt.Sprintf("%dms", int(m.TotalResponseTime.Milliseconds())/m.TotalChecks),
 				)
 				m.Mutex.RUnlock()
 			}
@@ -153,7 +154,7 @@ func (h *HealthChecker) checkUrl(ctx context.Context, url string) {
 			"status", "NONE",
 			"healthy", false,
 			"response_time", fmt.Sprintf("%dms", responseTime.Milliseconds()))
-
+		m.Mutex.Unlock()
 		return
 	}
 	defer resp.Body.Close()
@@ -168,6 +169,7 @@ func (h *HealthChecker) checkUrl(ctx context.Context, url string) {
 			"response_time", fmt.Sprintf("%dms", responseTime.Milliseconds()))
 	} else {
 		responseTime := time.Since(start)
+		m.TotalResponseTime += responseTime
 		slog.Error("",
 			"url", url,
 			"status", resp.StatusCode,

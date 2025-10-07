@@ -1,5 +1,5 @@
 {
-	"check_interval_seconds": 3,
+	"check_interval_seconds": 30,
 	"timeout_seconds": 5,
 	"urls": [
 		"https://google.com",
